@@ -1,6 +1,13 @@
 include:
   classes:
     - com.dream.gradletransformdemo
+    # - other/package
   methods:
-    - onCreate
-    - test
+    - insertByGT
+    - updateByGT
+    - addByGT
+    - deleteByGT
+    # - otherMethod
+  systemMethods:
+    - println
+    # - otherSystemMethod

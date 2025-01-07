@@ -16,6 +16,9 @@ class CustomTransformPlugin : Plugin<Project> {
 
         val analyticsExtension = project.extensions.create("analyticsExtension", AnalyticsExtension::class.java)
 
+        val projectPackageName = project.group.toString() // 获取项目的包名
+
+
         // 加载 YAML 配置
         // 构建 YAML 配置文件的相对路径
         val configFile = File(project.rootDir, "filter_config.yaml")
@@ -51,6 +54,15 @@ class CustomTransformPlugin : Plugin<Project> {
         } ?: emptyList()
         println("includeMethods $includeMethods")
 
+        val systemIncludeMethods: List<String> = config?.let { configMap ->
+            (configMap["include"] as? Map<String, Any>)?.let { includeMap ->
+                (includeMap["systemMethods"] as? List<*>)?.filterIsInstance<String>()
+                    ?.also { if (it.size != (includeMap["systemMethods"] as? List<*>)?.size) println("Warning: Some system method entries are not string") }
+            }
+        } ?: emptyList()
+        println("systemIncludeMethods $systemIncludeMethods")
+
+
 
         val androidComponents = project.extensions.getByType(AndroidComponentsExtension::class.java)
         androidComponents.onVariants { variant ->
@@ -64,6 +76,8 @@ class CustomTransformPlugin : Plugin<Project> {
                 it.analyticsExtension.set(analyticsExtension)
                 it.includeClasses.set(includeClasses.joinToString(","))
                 it.includeMethods.set(includeMethods.joinToString(","))
+                it.systemIncludeMethods.set(systemIncludeMethods.joinToString(","))
+                it.projectPackageName.set(projectPackageName)
             }
         }
     }

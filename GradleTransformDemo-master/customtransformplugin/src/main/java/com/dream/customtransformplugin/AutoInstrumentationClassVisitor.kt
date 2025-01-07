@@ -9,10 +9,11 @@ class AutoInstrumentationClassVisitor(
     private val analyticsExtension: AnalyticsExtension,
     private val includeClasses: List<String>,
     private val includeMethods: List<String>,
+    private val systemIncludeMethods: List<String>,
+    private val projectPackageName: String
 ) : ClassVisitor(Opcodes.ASM9, classVisitor) {
 
     private var currentClassName: String? = null
-    private var isDataClass: Boolean = false
 
 
     override fun visit(
@@ -25,8 +26,7 @@ class AutoInstrumentationClassVisitor(
     ) {
         super.visit(version, access, name, signature, superName, interfaces)
         currentClassName = name
-        isDataClass = name != null && superName != null && name.endsWith("Kt")  && superName == "java/lang/Object" && interfaces?.isEmpty() == true  &&  (access and Opcodes.ACC_FINAL) != 0
-        println("visit: $name, superName: $superName, isDataClass: $isDataClass")
+        println("visit: $name, superName: $superName")
     }
 
 
@@ -38,8 +38,10 @@ class AutoInstrumentationClassVisitor(
         exceptions: Array<out String>?
     ): MethodVisitor {
         val methodVisitor = super.visitMethod(access, name, descriptor, signature, exceptions)
-        val shouldInstrument = name != null && descriptor != null && shouldInstrumentMethod(name) && !isDataClass
-        println("visitMethod name: $name descriptor: $descriptor shouldInstrument: $shouldInstrument")
+        val shouldInstrument = name != null && descriptor != null &&
+                (access and (Opcodes.ACC_SYNTHETIC or Opcodes.ACC_BRIDGE)) == 0 && // 过滤合成和桥接方法
+                (shouldInstrumentProjectMethod(name) || shouldInstrumentSystemMethod(name))
+        println("visitMethod name: $name descriptor: $descriptor shouldInstrument: $shouldInstrument access: $access")
 
         return if (shouldInstrument && currentClassName != null) {
             AUtoInstrumentationMethodVisitor(
@@ -50,20 +52,31 @@ class AutoInstrumentationClassVisitor(
         }
     }
 
-
     /**
-     * 判断是否需要插桩的方法
+     * 判断是否需要插桩项目的方法
      */
-    private fun shouldInstrumentMethod(methodName: String): Boolean {
-        println("includeMethods $includeMethods")
-
+    private fun shouldInstrumentProjectMethod(methodName: String): Boolean {
         val shouldInstrument = if (includeMethods.isEmpty()) {
-            true
+            currentClassName?.startsWith(projectPackageName.replace(".", "/")) == true
         } else {
             includeMethods.contains(methodName)
         }
 
-        println("shouldInstrumentMethod: $methodName, result: $shouldInstrument")
+        println("shouldInstrumentProjectMethod: $methodName, result: $shouldInstrument")
+        return shouldInstrument
+    }
+
+
+    /**
+     * 判断是否需要插桩系统的方法
+     */
+    private fun shouldInstrumentSystemMethod(methodName: String): Boolean {
+        val shouldInstrument = if (systemIncludeMethods.isEmpty()) {
+            false
+        } else {
+            systemIncludeMethods.contains(methodName)
+        }
+        println("shouldInstrumentSystemMethod: $methodName, result: $shouldInstrument")
         return shouldInstrument
     }
 }

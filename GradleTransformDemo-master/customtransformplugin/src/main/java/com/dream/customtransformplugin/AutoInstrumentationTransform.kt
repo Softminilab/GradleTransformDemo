@@ -18,6 +18,12 @@ abstract class AutoInstrumentationTransform : AsmClassVisitorFactory<AutoInstrum
 
         @get:Input
         val includeMethods: org.gradle.api.provider.Property<String>
+
+        @get:Input
+        val systemIncludeMethods: org.gradle.api.provider.Property<String>
+
+        @get:Input
+        val projectPackageName: org.gradle.api.provider.Property<String>
     }
 
     override fun createClassVisitor(classContext: ClassContext, nextClassVisitor: ClassVisitor): ClassVisitor {
@@ -25,19 +31,22 @@ abstract class AutoInstrumentationTransform : AsmClassVisitorFactory<AutoInstrum
             nextClassVisitor,
             parameters.get().analyticsExtension.get(),
             parameters.get().includeClasses.get().split(",").filter { it.isNotBlank() },
-            parameters.get().includeMethods.get().split(",").filter { it.isNotBlank() }
+            parameters.get().includeMethods.get().split(",").filter { it.isNotBlank() },
+            parameters.get().systemIncludeMethods.get().split(",").filter { it.isNotBlank() },
+            parameters.get().projectPackageName.get()
         )
     }
 
     override fun isInstrumentable(classData: ClassData): Boolean {
-        return shouldInstrumentClass(classData.className)
+        val projectPackageName = parameters.get().projectPackageName.get()
+        return shouldInstrumentClass(classData.className,projectPackageName)
     }
 
 
-    private fun shouldInstrumentClass(className: String): Boolean {
+    private fun shouldInstrumentClass(className: String, projectPackageName: String): Boolean {
         val includeClasses = parameters.get().includeClasses.get().split(",").filter { it.isNotBlank() }
-        val shouldInstrument =  !className.contains("Liveliterals") &&  if (includeClasses.isEmpty()) {
-            true
+        val shouldInstrument = !className.contains("Liveliterals") && if (includeClasses.isEmpty()) {
+            className.startsWith(projectPackageName.replace(".", "/"))// 只插桩项目代码
         } else {
             includeClasses.any{className.contains(it)}
         }
@@ -45,4 +54,5 @@ abstract class AutoInstrumentationTransform : AsmClassVisitorFactory<AutoInstrum
         println("shouldInstrumentClass: $className, result: $shouldInstrument")
         return shouldInstrument
     }
+
 }
